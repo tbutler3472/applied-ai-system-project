@@ -1,3 +1,6 @@
+import re
+
+
 # FIX: Used AI assistance to make the secret number follow the selected
 # difficulty range.
 def get_range_for_difficulty(difficulty: str):
@@ -19,7 +22,7 @@ def get_range_for_difficulty(difficulty: str):
     return 1, 100
 
 
-def parse_guess(raw: str):
+def parse_guess(raw: str | None):
     """Parse raw user input into an integer guess.
 
     Args:
@@ -30,15 +33,20 @@ def parse_guess(raw: str):
         parsing succeeded, ``guess`` contains the integer when valid, and
         ``error_message`` contains feedback when invalid.
     """
-    raise NotImplementedError(
-        "Refactor this function from app.py into logic_utils.py"
-    )
+    if raw is None or raw.strip() == "":
+        return False, None, "Enter a guess."
+
+    value_text = raw.strip()
+    if re.fullmatch(r"[+-]?\d+", value_text) is None:
+        return False, None, "That is not a number."
+
+    return True, int(value_text), None
 
 # FIX: Used AI assistance to refactor check_guess and correct the reversed
 # higher/lower hints.
 
 
-def check_guess(guess, secret):
+def check_guess(guess: int, secret: int | str):
     """Compare a guess with the secret and return the outcome and message.
 
     Args:
@@ -49,20 +57,15 @@ def check_guess(guess, secret):
         A tuple containing an outcome (``"Win"``, ``"Too High"``, or
         ``"Too Low"``) and the corresponding user-facing message.
     """
+    guess = int(guess)
+    secret = int(secret)
+
     if guess == secret:
         return "Win", "🎉 Correct!"
 
-    try:
-        if guess > secret:
-            return "Too High", "📉 Go LOWER!"
-        return "Too Low", "📈 Go HIGHER!"
-    except TypeError:
-        g = str(guess)
-        if g == secret:
-            return "Win", "🎉 Correct!"
-        if g > secret:
-            return "Too High", "📉 Go LOWER!"
-        return "Too Low", "📈 Go HIGHER!"
+    if guess > secret:
+        return "Too High", "📉 Go LOWER!"
+    return "Too Low", "📈 Go HIGHER!"
 
 
 def update_score(current_score: int, outcome: str, attempt_number: int):
@@ -74,9 +77,15 @@ def update_score(current_score: int, outcome: str, attempt_number: int):
         attempt_number: The one-based number of the current attempt.
 
     Returns:
-        The updated score. The current module intentionally leaves this
-        operation unimplemented and raises ``NotImplementedError``.
+        The updated score.
     """
-    raise NotImplementedError(
-        "Refactor this function from app.py into logic_utils.py"
-    )
+    if outcome == "Win":
+        return current_score + max(10, 100 - 10 * (attempt_number + 1))
+
+    if outcome == "Too High":
+        return current_score + (5 if attempt_number % 2 == 0 else -5)
+
+    if outcome == "Too Low":
+        return current_score - 5
+
+    return current_score
