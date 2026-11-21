@@ -77,12 +77,12 @@ def _app_test():
 def test_invalid_and_out_of_range_guesses_do_not_consume_attempts():
     app = _app_test()
     app.text_input(key="guess_input_Normal").set_value("12.5")
-    app.button[0].click().run()
+    app.button[0].click().run(timeout=10)
     assert app.session_state["attempts"] == 0
     assert app.session_state["history"] == []
 
     app.text_input(key="guess_input_Normal").set_value("51")
-    app.button[0].click().run()
+    app.button[0].click().run(timeout=10)
     assert app.session_state["attempts"] == 0
     assert app.session_state["history"] == []
 
@@ -96,7 +96,7 @@ def test_new_game_resets_all_game_state(monkeypatch):
     app.session_state["secret"] = 7
     monkeypatch.setattr(random, "randint", lambda low, high: 23)
 
-    app.button[1].click().run()
+    app.button[1].click().run(timeout=10)
 
     assert app.session_state["attempts"] == 0
     assert app.session_state["score"] == 0

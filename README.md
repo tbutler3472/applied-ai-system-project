@@ -1,70 +1,47 @@
-# 🎮 Game Glitch Investigator: The Impossible Guesser
+# Game Glitch Investigator
 
-## 🚨 The Situation
+A Streamlit number-guessing game with difficulty settings, higher/lower hints,
+Hot/Warm/Cold feedback, score, guess history, and an optional local AI Strategy
+Coach.
 
-You asked an AI to build a simple "Number Guessing Game" using Streamlit.
-It wrote the code, ran away, and now the game is unplayable. 
+## Run the game
 
-- You can't win.
-- The hints lie to you.
-- The secret number seems to have commitment issues.
+1. Install Python dependencies with `pip install -r requirements.txt`.
+2. To use the coach, start Ollama and make sure `llama3.2:3b` is available
+   locally (`ollama pull llama3.2:3b`).
+3. Start the app with `python -m streamlit run app.py`.
 
-## 🛠️ Setup
+The game itself works without Ollama. If the local model is unavailable or
+returns an unusable answer, the coach shows a friendly local explanation instead.
 
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run the broken app: `python -m streamlit run app.py`
+## AI Strategy Coach
 
-## 🕵️‍♂️ Your Mission
+Choose **Ask AI for Strategy** to get a recommendation based on the selected
+difficulty, the original range, and public guess outcomes. The coach narrows
+the remaining range from Too High/Too Low feedback, counts possible numbers,
+skips guesses already made, and selects an unused number nearest the midpoint.
+It also checks remaining attempts against how many possibilities can be
+resolved in that many higher/lower guesses, then shows the ranges that either
+possible result would leave.
 
-1. **Play the game.** Open the "Developer Debug Info" tab in the app to see the secret number. Try to win.
-2. **Find the State Bug.** Why does the secret number change every time you click "Submit"? Ask ChatGPT: *"How do I keep a variable from resetting in Streamlit when I click a button?"*
-3. **Fix the Logic.** The hints ("Higher/Lower") are wrong. Fix them.
-4. **Refactor & Test.** - Move the logic into `logic_utils.py`.
-   - Run `pytest` in your terminal.
-   - Keep fixing until all tests pass!
+For its explanation, the app retrieves relevant strategy entries from
+`data/guessing_strategies.json` using lightweight keyword matching. The local
+Ollama model applies those tips to the player's situation. The deterministic
+recommendation and bounds remain separate from the model-written explanation;
+responses with contradictory claims or invented numeric details are replaced
+with a natural local fallback. **View Retrieved Strategy Sources** keeps the
+source titles, IDs, and text available for demonstration.
 
-## 📝 Document Your Experience
+Only public information is used by retrieval and coaching: difficulty, allowed
+bounds, guesses, outcomes, and remaining attempts. The secret number is never
+sent to the model or strategy helpers.
 
- The game's purpose is to guess a randomly generated secret number while using higher and lower hints to find the correct answer.
+## Tests
 
- The bugs I found were reversed higher/lower hints, the secret number not matching the selected difficulty range, and the game not resetting correctly when changing difficulty.
+Run the full test suite with:
 
-I fixed the hint logic, made the secret number follow the selected difficulty range, and fixed the game so it properly updates when the difficulty changes.
-
-## 📸 Demo Walkthrough
-
-Describe your fixed game in numbered steps so a reader can follow along without watching a video:
-
-## Demo Walkthrough
-
-1. User selects a difficulty level for the game.
-2. The game generates a secret number based on the selected difficulty range.
-3. User enters a guess that is lower than the secret number.
-4. The game returns "Too Low" and tells the user to go higher.
-5. User enters a guess that is higher than the secret number.
-6. The game returns "Too High" and tells the user to go lower.
-7. The user continues guessing until they enter the correct secret number.
-8. The game tells the user that their guess is correct and shows their final result.
-
-**Screenshot** *(optional)*: <!-- Insert a screenshot of your fixed, winning game here -->
-
-## 🧪 Test Results
-
-```
-============================= test session starts =============================
-platform win32 -- Python 3.13.1, pytest-9.1.1, pluggy-1.6.0
-plugins: anyio-4.13.0
-collected 7 items
-
-tests\test_game_logic.py .......                                      [100%]
-
-============================== 7 passed in 0.14s ==============================
+```shell
+python -m pytest -v
 ```
 
-## 🚀 Stretch Features
-
-## Enhanced Game UI
-
-I added a Hot/Warm/Cold feature that tells the player how close their guess is to the secret number. If the guess is really close it will say  Hot, if it is somewhat close it will say python -m streamlit run app.py Warm, and if it is far away it will say  Cold.
-
-I added this to `app.py` where the game checks the player's guess. This didn't change any of the original game logic and the higher/lower hints, score, difficulty, and Guess History still work the same.
+Ollama is mocked in automated tests, so a running model is not required.

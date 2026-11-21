@@ -1,0 +1,50 @@
+[
+  {
+    "id": "binary_search",
+    "title": "Use binary search",
+    "text": "For a number in an ordered range, binary search can find it efficiently: each higher-or-lower clue should eliminate about half of the remaining candidates.",
+    "keywords": ["binary search", "efficient", "eliminate half", "range"]
+  },
+  {
+    "id": "narrow_after_too_high",
+    "title": "Narrow the range after Too High",
+    "text": "After a Too High result, the secret must be below that guess. Lower the upper end of your possible range to one less than the guess, then choose only within the smaller range.",
+    "keywords": ["too high", "lower", "upper end", "narrow range"]
+  },
+  {
+    "id": "narrow_after_too_low",
+    "title": "Narrow the range after Too Low",
+    "text": "After a Too Low result, the secret must be above that guess. Raise the lower end of your possible range to one more than the guess, then choose only within the smaller range.",
+    "keywords": ["too low", "higher", "lower end", "narrow range"]
+  },
+  {
+    "id": "choose_midpoint",
+    "title": "Choose the midpoint",
+    "text": "When both ends of your possible range are known, try its midpoint. This balances the remaining choices and is the key step in binary search.",
+    "keywords": ["midpoint", "middle", "binary search", "balanced"]
+  },
+  {
+    "id": "avoid_repeated_guesses",
+    "title": "Avoid repeated guesses",
+    "text": "Do not guess a number you have already tried. Keep track of previous guesses and use each higher-or-lower result to remove impossible numbers from consideration.",
+    "keywords": ["repeat", "previous guesses", "history", "impossible numbers"]
+  },
+  {
+    "id": "easy_difficulty",
+    "title": "Easy difficulty tip",
+    "text": "On Easy, the range is small, so keep a compact lower and upper bound and adjust the midpoint after each clue. You have enough attempts to refine the range steadily.",
+    "keywords": ["easy", "small range", "midpoint", "attempts"]
+  },
+  {
+    "id": "normal_difficulty",
+    "title": "Normal difficulty tip",
+    "text": "On Normal, use the lower and upper bounds carefully and make large, balanced cuts. A midpoint strategy helps you use the available attempts efficiently.",
+    "keywords": ["normal", "bounds", "balanced", "midpoint"]
+  },
+  {
+    "id": "hard_difficulty",
+    "title": "Hard difficulty tip",
+    "text": "On Hard, attempts are limited, so avoid small incremental guesses. Start near the midpoint and use every Too High or Too Low clue to cut the remaining range substantially.",
+    "keywords": ["hard", "limited attempts", "midpoint", "too high", "too low"]
+  }
+]

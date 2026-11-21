@@ -6,6 +6,14 @@ from logic_utils import (
     parse_guess,
     update_score,
 )
+from rag_utils import (
+    ATTEMPT_LIMITS,
+    StrategyError,
+    analyze_strategy,
+    fallback_explanation,
+    generate_explanation,
+    retrieve_strategies,
+)
 
 st.set_page_config(page_title="Glitchy Guesser", page_icon="🎮")
 
@@ -20,12 +28,7 @@ difficulty = st.sidebar.selectbox(
     index=1,
 )
 
-attempt_limit_map = {
-    "Easy": 6,
-    "Normal": 8,
-    "Hard": 5,
-}
-attempt_limit = attempt_limit_map[difficulty]
+attempt_limit = ATTEMPT_LIMITS[difficulty]
 
 low, high = get_range_for_difficulty(difficulty)
 
@@ -42,6 +45,7 @@ if (
     st.session_state.score = 0
     st.session_state.status = "playing"
     st.session_state.history = []
+    st.session_state.guess_outcomes = []
 
 if "attempts" not in st.session_state:
     st.session_state.attempts = 0
@@ -53,6 +57,8 @@ if "status" not in st.session_state:
 
 if "history" not in st.session_state:
     st.session_state.history = []
+if "guess_outcomes" not in st.session_state:
+    st.session_state.guess_outcomes = []
 
 st.sidebar.subheader("Guess History")
 if st.session_state.history:
@@ -66,13 +72,6 @@ st.info(
     f"Guess a number between {low} and {high}. "
     f"Attempts left: {attempt_limit - st.session_state.attempts}"
 )
-
-with st.expander("Developer Debug Info"):
-    st.write("Secret:", st.session_state.secret)
-    st.write("Attempts:", st.session_state.attempts)
-    st.write("Score:", st.session_state.score)
-    st.write("Difficulty:", difficulty)
-    st.write("History:", st.session_state.history)
 
 raw_guess = st.text_input(
     "Enter your guess:",
@@ -94,8 +93,101 @@ if new_game:
     st.session_state.secret = random.randint(low, high)
     st.session_state.secret_difficulty = difficulty
     st.session_state.history = []
+    st.session_state.guess_outcomes = []
     st.success("New game started.")
     st.rerun()
+
+if st.button("Ask AI for Strategy"):
+    public_history = [
+        {"guess": guess, "outcome": outcome}
+        for guess, outcome in zip(
+            st.session_state.history, st.session_state.guess_outcomes
+        )
+    ]
+    try:
+        analysis = analyze_strategy(
+            difficulty, (low, high), public_history
+        )
+    except ValueError as error:
+        st.subheader("AI Strategy Coach")
+        st.info("I can’t make a reliable suggestion from those clues. Start a new game to try again.")
+    else:
+        st.subheader("AI Strategy Coach")
+        if analysis.completed:
+            st.success("You found it! Enjoy the win, and start a new game when you’re ready.")
+        elif analysis.attempts_remaining == 0:
+            st.info("That round is over, so there are no guesses left. Start a new game to try another strategy.")
+        elif analysis.recommended_guess is None or analysis.remaining_range is None:
+            st.info("There isn’t an unused number left in the possible range. Start a new game for a fresh round.")
+        else:
+            remaining_low, remaining_high = analysis.remaining_range
+            metric1, metric2, metric3, metric4 = st.columns(4)
+            metric1.metric("Recommended Next Guess", analysis.recommended_guess)
+            metric2.metric(
+                "Remaining Possible Range",
+                f"{remaining_low}–{remaining_high}",
+            )
+            metric3.metric("Possible Numbers Remaining", analysis.possible_count)
+            metric4.metric("Attempts Remaining", analysis.attempts_remaining)
+
+            if analysis.attempts_remaining == 1:
+                st.warning("You have one guess left. Make it count.")
+            if analysis.can_guarantee_win:
+                st.success(
+                    "Good news—you still have enough tries to guarantee a win "
+                    "if you keep narrowing the range with the clues."
+                )
+            else:
+                st.info(
+                    "There are more possible numbers than your remaining guesses "
+                    "can guarantee. Keep choosing near the middle for your best chance."
+                )
+
+            st.markdown("### Your Strategy")
+            try:
+                sources = retrieve_strategies(
+                    difficulty, (low, high), public_history
+                )
+            except StrategyError as error:
+                sources = []
+                st.caption("I’m using a quick game tip while the coach is unavailable.")
+
+            if sources:
+                explanation = generate_explanation(
+                    difficulty,
+                    (low, high),
+                    public_history,
+                    sources,
+                )
+            else:
+                explanation = fallback_explanation(difficulty, analysis)
+            st.write(explanation)
+
+            st.markdown("### What To Do Next")
+            high_text = (
+                f"{analysis.higher_range[0]}–{analysis.higher_range[1]}"
+                if analysis.higher_range
+                else "no numbers would remain"
+            )
+            low_text = (
+                f"{analysis.lower_range[0]}–{analysis.lower_range[1]}"
+                if analysis.lower_range
+                else "no numbers would remain"
+            )
+            st.write(
+                f"If {analysis.recommended_guess} is **Too High**, the range "
+                f"would become {high_text}. If it’s **Too Low**, it would "
+                f"become {low_text}."
+            )
+            with st.expander("View Retrieved Strategy Sources"):
+                if sources:
+                    for source in sources:
+                        st.markdown(
+                            f"**{source['title']}** (`{source['id']}`)"
+                        )
+                        st.write(source["text"])
+                else:
+                    st.caption("Strategy sources are unavailable right now.")
 
 if st.session_state.status != "playing":
     if st.session_state.status == "won":
@@ -121,6 +213,7 @@ if submit:
             secret = st.session_state.secret
 
         outcome, message = check_guess(guess_int, secret)
+        st.session_state.guess_outcomes.append(outcome)
 
         distance = abs(guess_int - st.session_state.secret)
         range_size = high - low
@@ -158,4 +251,3 @@ if submit:
                 )
 
 st.divider()
-st.caption("Built by an AI that claims this code is production-ready.")
