@@ -1,0 +1,50 @@
+flowchart TD
+    User[Player input] --> UI[Streamlit user interface]
+    UI --> Game[Number-guessing game logic]
+    Game --> State[Game state and guess history]
+    State --> UI
+    State --> Analysis[Deterministic range and attempt analysis]
+    UI --> Choice{AI feature requested?}
+
+    Choice -->|Strategy Coach| RAG[RAG Strategy Coach]
+    State --> RAG
+    RAG --> Retrieval[Keyword retrieval logic]
+    Retrieval --> KB[JSON strategy knowledge base]
+    KB --> Retrieval
+    Retrieval --> CoachPrompt[Public facts and retrieved advice]
+    Analysis --> CoachPrompt
+    CoachPrompt --> Ollama[Local Ollama llama3.2:3b]
+    Ollama --> RAGValidation[Coach response validation]
+    RAGValidation -->|Valid| Output[Results shown in Streamlit]
+    RAGValidation -->|Invalid or request failure| Fallback[Deterministic fallback]
+    Fallback --> Output
+
+    Choice -->|Strategy Agent| Agent[AI Strategy Agent]
+    State --> Agent
+    Analysis --> Agent
+    Agent --> AgentPrompt[Tool-selection prompt]
+    AgentPrompt --> Ollama
+    Ollama --> Selection[Dynamic tool selection]
+    Selection --> Guardrails[Tool-plan validation]
+    Guardrails -->|Allowed tool| Tools[Fixed Python tool execution]
+    Guardrails -->|Invalid plan or request failure| AgentFallback[Deterministic fallback]
+    Tools --> Range[analyze_range]
+    Tools --> History[review_guess_history]
+    Tools --> Attempts[evaluate_attempts]
+    Tools --> Strategy[retrieve_strategy]
+    Tools --> Guess[recommend_next_guess]
+    Strategy --> Retrieval
+    Range --> ResultsBundle[Tool results]
+    History --> ResultsBundle
+    Attempts --> ResultsBundle
+    Guess --> ResultsBundle
+    ResultsBundle --> Trace[Decision trace]
+    ResultsBundle --> FinalPrompt[Tool results added to final explanation prompt]
+    FinalPrompt --> Ollama
+    Ollama --> FinalCheck[Final explanation validation]
+    Analysis --> FinalCheck
+    FinalCheck -->|Valid| Output
+    FinalCheck -->|Invalid or timeout| AgentFallback
+    AgentFallback --> Output
+    Trace --> Output
+    Output --> UI

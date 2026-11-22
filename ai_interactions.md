@@ -1,88 +1,119 @@
-# AI Interactions Log
+﻿# AI Interactions
 
-> **Stretch features only.** Only fill in the sections that apply to stretch features you attempted. If you did not attempt a stretch feature, leave its section blank or delete it. This file is not required for the core project.
+This file records how I used AI while building the project. I am separating real local-model behavior from mocked tests and Copilot-assisted coding help. It does not describe any interaction as successful if the code or the model run did not show that result.
 
----
+## Real agent traces
 
-## Agent Workflow (SF8)
+The [agent trace log](logs/agent_traces.md) contains captured Ollama tool
+selections, tool results, and examples where the final explanation used a
+deterministic fallback.
 
-> Document your experience using an AI agent (e.g., Cursor Agent, Claude, Copilot) to make multi-step changes autonomously.
+## Copilot-assisted development
 
-**What task did you give the agent?**
+### Guess history
 
-I asked the AI agent to add a Guess History feature to the game so it could keep track of the guesses the user made. I also wanted the history to reset when a new game started or when the difficulty was changed.
+I asked for a Guess History feature that would keep valid guesses, reset for a new game or difficulty change, and ignore invalid input. The assistant changed `app.py` to use the existing session state and list valid guesses in the sidebar.
 
-**What did the agent do?**
+I verified this myself with Streamlit tests and input checks. Invalid decimal and out-of-range guesses leave the attempt and history unchanged. I kept the implementation because the tests pass and it fits the existing game flow.
 
-The agent changed the app.py file and added the Guess History to the sidebar. It makes it so only valid number guesses were added to the history and then when the a input is  invalid it won't be added. It also made the guess history reset when I started a new game or changed the difficulty.
+### Higher/lower hint bug
 
-**What did you have to verify or fix manually?**
+Copilot helped identify and fix the higher/lower hint problem by moving the
+comparison into `logic_utils.py`. The expected behavior is that a guess lower
+than the secret returns Too Low, and a guess higher than the secret returns
+Too High.
 
-I manually ran the game to make sure the Guess History actually worked. I entered multiple number guesses and made sure they showed up in the history. And saw on the side after every new guess the previous guess would show up with a number beside it with the guess number as well. I also made sure entering something that wasn't a number like a word wouldn't count as a guess. 
+My original reflection records that an AI suggestion was to change the tests.
+When I ran them, three out of four failed. I then used AI to revise the old
+tests to match the `check_guess` function, and four tests passed. That experience
+taught me to check that a test still represents the intended behavior, not just
+whether it passes.
 
-Files modified: The agent modified app.py to add the Guess History feature. No changes were needed to logic_utils.py or tests/test_game_logic.py.
+### RAG and agent implementation
 
----
+I used Copilot to draft and revise the RAG retrieval helpers, agent tool
+definitions, Ollama prompts, and response validation. The current workflow
+passes public game state and only exposes the fixed read-only tools.
 
-## Test Generation (SF7)
+The parts I kept now appear in:
 
-> Document how you used AI to help generate or improve tests.
- Prompt Used:
+- `rag_utils.py` for public-state analysis, retrieval, and fallback explanations;
+- `agent_tools.py` for fixed read-only tools;
+- `agent_validation.py` for JSON and public-fact checks;
+- `agent_prompts.py` for bounded tool and explanation prompts; and
+- `agent_utils.py` for trace collection and timeout handling.
 
-Identify three potential edge cases for my number guessing game and create pytest tests for them. Make sure the tests verify that the game handles the edge cases correctly.
+I revised the workflow so tool arguments are empty and Python calculates all
+numeric results rather than asking the model to supply them.
 
-| Edge Case | Prompt Used | AI-Suggested Test | Did It Pass? | Your Reasoning |
-|-----------|-------------|-------------------|--------------|----------------|
-| Edge Case | Prompt Used | AI-Suggested Test | Did It Pass? | Your Reasoning |
-|------------|-------------|-------------------|--------------|----------------|
-| Edge Case | Prompt Used | AI-Suggested Test | Did It Pass? | Your Reasoning |
-|------------|-------------|-------------------|--------------|----------------|
-| Boundary exact match | Identify three edge cases for my game and make pytest tests for them. | Test the lowest and highest numbers in the range. | Yes | I chose this to make sure the game still works correctly at the lowest and highest numbers. |
-| Extreme comparison hints | Identify three edge cases for my game and make pytest tests for them. | Test guesses that are really far from the secret number. | Yes | I chose this to make sure the higher and lower hints still work when the guess is far away from the secret number. |
-| Near-boundary guesses | Identify three edge cases for my game and make pytest tests for them. | Test guesses that are one number away from the secret number. | Yes | I chose this to make sure the game still gives the right hint when the guess is really close to the secret number. ||
+### Tests
 
----
+Copilot helped identify boundary cases for the game and suggested tests for exact matches, far-away guesses, and one-number-off guesses. I reviewed the tests, kept the valid cases in `tests/test_game_logic.py`, and ran them under pytest.
 
-## Linting & Style (SF9)
+It also helped write mocked Ollama tests for success, malformed JSON, unknown tools, unsafe arguments, connection failures, and timeouts. Those tests verify code paths but are not evidence of a real model response.
 
-> Document your use of AI for linting or code style improvements.
+### Style and documentation
 
-**Prompt used: 
+Copilot suggestions were used to add docstrings and clean PEP 8 formatting in `logic_utils.py`. I ran the test suite after the changes and kept the behavior-focused code.
 
-```
-Review `logic_utils.py` and add professional docstrings to every function without changing how any of the functions work. Then review the file for PEP 8 style issues, including formatting and naming. Apply any appropriate PEP 8 fixes without changing the program's behavior. Afterward, tell me exactly what changes you made and provide the linting/style-check output so I can document it in `ai_interactions.md`.
+## RAG retrieval examples
 
-**Linting output before:**
+The custom JSON strategy knowledge base gives the coach strategy notes that
+match the current difficulty and clues. For an Easy opening, retrieval can
+return Easy, midpoint, and binary-search tips. After a Too High clue, it can
+return the matching advice to lower the upper bound. This gives Ollama
+situation-specific reference text in addition to generic guessing advice. It
+is a qualitative reason retrieval may make advice more relevant; I did not run
+a baseline comparison or measure an improvement.
 
-```
-pycodestyle found 3 PEP 8 issues:
-- 2 overlong FIX comments
-- 1 missing blank line before check_guess
-```
+### Too High clue
 
-**Changes applied:**
+Public input: Hard, range 1–100, and 70 → Too High.
 
-The AI fixed the two comments that were too long by splitting them into multiple lines and added the missing spacing before the check_guess function. It also added more detailed docstrings to all four functions in logic_utils.py. After the changes the pycodestyle check passed with no output and all 7 pytest tests passed.
+Retrieval returned the Hard difficulty source and the Too High narrowing source. The retrieved text says to lower the upper bound to 69 and choose within the smaller range.
 
----
+The deterministic result leaves range 1–69 and recommends 35. Ollama is allowed
+to explain the clue only after Python has calculated these facts.
 
-## Model Comparison (SF11)
+### Easy opening
 
-# Model Comparison (SF11)
+Public input: Easy, range 1–20, no guesses.
 
-> Compare two AI models on the same task.
+Retrieval returned Easy difficulty, midpoint, and binary-search sources. The deterministic result recommends 10.
 
-**Task given to both models:**
+## Successful Ollama-generated explanations
 
-I asked both models to help fix the higher and lower hint bug in my number guessing game and explain why the fix would work.
+The mock tests contain examples where Ollama-style text passes validation and is shown as `explanation_source="ollama"`. These are automated test examples, not live model claims.
 
-| | Model A | Model B |
-|-|---------|---------|
-| Model name | ChatGPT | Copilot |
-| Response summary | Gave me the fix directly and explained what needed to be changed with the higher and lower hints. | Gave me a fix but also tried to make changes to my files and run tests that I didn't ask it to do. |
-| **More Pythonic?** | Yes | No |
-| **Clearer explanation?** | Yes | No |
+The live traces in `logs/agent_traces.md` describe real local-model tool runs. In captured runs, Ollama often executed tools successfully but did not always produce a usable final explanation.
 
-**Which did you prefer and why?**
+## Successful tool execution followed by fallback
 
-I preferred ChatGPT because it gave me what I asked for directly and was easier for me to understand. Copilot still gave me a fix but it did extra stuff like trying to change my files and run tests when I was only asking it to show me the fix. And I had to prompt it a couple different times because it kept trying to make chnanges to the code that I never asked for. 
+Real captured Easy and Hard runs show Ollama selecting and executing tools. In at least one Easy live run, the model's final text mentioned implementation tools and was rejected by the player-facing response checks. The app kept the deterministic range and guess and showed a local fallback.
+
+The live runs selected different combinations and orders of tools depending on
+the game state. Some used four tools and others used five. This demonstrates
+model-selected tool execution, while the final explanation may still be
+rejected or replaced.
+
+## Complete model request failures
+
+A timeout during selection is covered by mocked automated tests; I do not have
+a separate captured live selection-timeout trace. In a captured live Hard run,
+the final explanation timed out after the tools had run, and the app kept the
+tool trace while using fallback text.
+
+The existing agent tests also cover a 30-second overall budget, malformed JSON, empty plans, unknown tools, and repeated tool selections. These test cases are not presented as successful live model conversations.
+
+## Mocked or automated examples
+
+Automated pytest examples prove that:
+
+- valid tool plans execute and pass results to a final prompt;
+- unknown tools stop safely;
+- arguments must be empty;
+- malformed JSON uses fallback;
+- incorrect final text is rejected; and
+- request timeouts produce fallback explanations.
+
+These tests use `unittest.mock.Mock` or `requests.Timeout`. They show that the app handles expected paths but do not prove Ollama's live output for those exact scenarios.

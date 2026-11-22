@@ -1,3 +1,4 @@
+import json
 import random
 import streamlit as st
 from logic_utils import (
@@ -14,6 +15,7 @@ from rag_utils import (
     generate_explanation,
     retrieve_strategies,
 )
+from agent_utils import AgentError, run_strategy_agent
 
 st.set_page_config(page_title="Glitchy Guesser", page_icon="🎮")
 
@@ -188,6 +190,79 @@ if st.button("Ask AI for Strategy"):
                         st.write(source["text"])
                 else:
                     st.caption("Strategy sources are unavailable right now.")
+
+st.divider()
+st.subheader("AI Strategy Agent")
+if st.button("Ask AI Agent"):
+    public_history = [
+        {"guess": guess, "outcome": outcome}
+        for guess, outcome in zip(
+            st.session_state.history, st.session_state.guess_outcomes
+        )
+    ]
+    try:
+        with st.spinner("The agent is choosing and using strategy tools..."):
+            agent_result = run_strategy_agent(
+                difficulty=difficulty,
+                allowed_range=(low, high),
+                history=public_history,
+            )
+    except AgentError as error:
+        st.warning(f"The strategy agent could not analyze this game: {error}")
+    else:
+        agent_analysis = agent_result.analysis
+        if agent_analysis.completed:
+            st.success(
+                "You already found the number. Start a new game whenever you’re ready."
+            )
+        elif agent_analysis.attempts_remaining == 0:
+            st.info("This round is complete; there are no guesses remaining.")
+        elif (
+            agent_analysis.recommended_guess is None
+            or agent_analysis.remaining_range is None
+        ):
+            st.info(
+                "There are no unused possible guesses left. Start a new game for another round."
+            )
+        else:
+            range_low, range_high = agent_analysis.remaining_range
+            agent_cols = st.columns(4)
+            agent_cols[0].metric(
+                "Recommended Guess", agent_analysis.recommended_guess
+            )
+            agent_cols[1].metric(
+                "Possible Range", f"{range_low}–{range_high}"
+            )
+            agent_cols[2].metric(
+                "Attempts Left", agent_analysis.attempts_remaining
+            )
+            agent_cols[3].metric(
+                "Possible Answers", agent_analysis.possible_count
+            )
+            st.markdown("### Your Game Analysis")
+            st.write(agent_result.explanation)
+            if agent_result.explanation_source == "fallback":
+                fallback_notice = "The explanation above is a deterministic fallback."
+                if agent_result.stopped_reason:
+                    fallback_notice += f" {agent_result.stopped_reason}"
+                st.caption(fallback_notice)
+
+        with st.expander("Agent Decision Trace"):
+            if agent_result.trace:
+                for step_number, entry in enumerate(agent_result.trace, start=1):
+                    st.markdown(f"**Step {step_number}: {entry.tool}**")
+                    st.caption(f"Why: {entry.reason or 'Not provided'}")
+                    if entry.warning:
+                        st.warning(entry.warning)
+                    st.markdown("Tool result")
+                    try:
+                        result_data = json.loads(entry.result)
+                    except json.JSONDecodeError:
+                        st.write(entry.result)
+                    else:
+                        st.json(result_data, expanded=False)
+            else:
+                st.caption("No tool calls were needed for this game state.")
 
 if st.session_state.status != "playing":
     if st.session_state.status == "won":

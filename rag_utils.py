@@ -10,7 +10,7 @@ import requests
 KNOWLEDGE_BASE_PATH = Path(__file__).parent / "data" / "guessing_strategies.json"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3.2:3b"
-OLLAMA_TIMEOUT_SECONDS = 30
+OLLAMA_TIMEOUT_SECONDS = 60
 ATTEMPT_LIMITS = {"Easy": 6, "Normal": 8, "Hard": 5}
 
 
